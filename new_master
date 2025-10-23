@@ -1,0 +1,132 @@
+import cv2
+import numpy as np
+import random as rd
+
+
+def create_empty(n: int, k: float) -> np.ndarray:
+    return np.zeros((int(n * k), int(n * k)), dtype=np.uint8)
+
+
+def add_bright(img: np.ndarray) -> np.ndarray:
+    return np.array([list(map(lambda x: 255 * x, elem)) for elem in img])
+
+
+def find_empties(n: int, k: float) -> set:
+    length = int(n * k)
+    diff = length - (n * int(k))
+    step = int(k)
+    count, i, out = 0, step, set()
+    while diff > 0:
+        out |= {i}
+        if diff > 1:
+            out |= {length - i - 1}
+        i += step + 1
+        diff -= 2
+    return out
+
+
+def int_to_cluster(n: int, k: float) -> tuple:
+    int_part = int(k)
+    size = int_part * int_part
+    count = min(n // (256 // (size + 1)), size)
+    return tuple(map(int, ('1 ' * count + '0 ' * (size - count)).rstrip().split()))
+
+
+def get_cluster(values: tuple, size: int) -> list:
+    values_list = list(values)
+    rd.shuffle(values_list)  # Исправлено: перемешиваем список, а не кортеж
+    cluster = []
+    for i in range(size):
+        cluster.append(values_list[i * size:(i + 1) * size])
+    return cluster
+
+
+def fill_empties_smart(new_img: np.ndarray, empties: set) -> None:
+    """
+    Заполняет пустые строки и столбцы с помощью интерполяции соседних значений
+    """
+    if not empties:
+        return
+    
+    size = new_img.shape[0]
+    
+    # Заполняем пустые строки
+    for empty_row in sorted(empties):
+        # Находим ближайшие непустые строки сверху и снизу
+        top_row = empty_row - 1
+        while top_row >= 0 and top_row in empties:
+            top_row -= 1
+        
+        bottom_row = empty_row + 1
+        while bottom_row < size and bottom_row in empties:
+            bottom_row += 1
+        
+        # Интерполяция между найденными строками
+        if top_row >= 0 and bottom_row < size:
+            # Линейная интерполяция
+            alpha = (empty_row - top_row) / (bottom_row - top_row)
+            new_img[empty_row] = (1 - alpha) * new_img[top_row] + alpha * new_img[bottom_row]
+        elif top_row >= 0:
+            # Копируем верхнюю строку
+            new_img[empty_row] = new_img[top_row]
+        elif bottom_row < size:
+            # Копируем нижнюю строку
+            new_img[empty_row] = new_img[bottom_row]
+    
+    # Заполняем пустые столбцы (транспонируем, заполняем, и обратно)
+    if empties:  # если еще есть пустые столбцы
+        img_transposed = new_img.T
+        for empty_col in sorted(empties):
+            # Находим ближайшие непустые столбцы слева и справа
+            left_col = empty_col - 1
+            while left_col >= 0 and left_col in empties:
+                left_col -= 1
+            
+            right_col = empty_col + 1
+            while right_col < size and right_col in empties:
+                right_col += 1
+            
+            # Интерполяция между найденными столбцами
+            if left_col >= 0 and right_col < size:
+                alpha = (empty_col - left_col) / (right_col - left_col)
+                img_transposed[empty_col] = (1 - alpha) * img_transposed[left_col] + alpha * img_transposed[right_col]
+            elif left_col >= 0:
+                img_transposed[empty_col] = img_transposed[left_col]
+            elif right_col < size:
+                img_transposed[empty_col] = img_transposed[right_col]
+        
+        new_img[:, :] = img_transposed.T
+
+
+def fill_clusters(img: np.ndarray, new_img: np.ndarray, empties: set, n: int, k: float,
+                  pattern=get_cluster) -> None:
+    int_part = int(k)
+    size = int(n * k)
+    cl_ind = sorted((set(range(size)) - empties))[::int_part]
+    for i in range(n):
+        for j in range(n):
+            values = pattern(int_to_cluster(img[i, j], k), int_part)
+            new_img[cl_ind[i]:cl_ind[i]+int_part, cl_ind[j]:cl_ind[j]+int_part] = values
+    
+    # ЗАПОЛНЯЕМ ПУСТЫЕ ОБЛАСТИ ПЕРЕД ВОЗВРАЩЕНИЕМ
+    fill_empties_smart(new_img, empties)
+
+
+if __name__ == "__main__":
+    # Baboo_256.tiff  Pepper_256.tiff
+    img = cv2.imread(f'images/{input()}', cv2.IMREAD_GRAYSCALE)
+    n, k = len(img), float(input())
+    # n, k = int(input()), float(input())
+    new_image = create_empty(n, k)
+    empties_set = find_empties(n, k)
+    fill_clusters(img, new_image, empties_set, n, k)
+    new_image = add_bright(new_image)
+    print(f"Размер исходного изображения: {n}x{n}")
+    print(f"Размер нового изображения: {new_image.shape[0]}x{new_image.shape[1]}")
+    print(f"Количество пустых строк/столбцов: {len(empties_set)}")
+    cv2.imshow('image', new_image)
+    cv2.waitKey(0)
+    cv2.destroyWindow('image')
+    
+    # Сохраняем результат для сравнения
+    cv2.imwrite('result_image.png', new_image)
