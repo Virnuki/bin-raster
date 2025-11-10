@@ -4,8 +4,8 @@ import random as rd
 from math import ceil
 
 
-def create_empty(n: int, k: float) -> np.ndarray:
-    return np.zeros((int(n * k), int(n * k)), dtype=np.uint8)
+def create_empty(fin_size: int) -> np.ndarray:
+    return np.zeros((fin_size, fin_size), dtype=np.uint8)
 
 
 def add_bright(img: np.ndarray) -> np.ndarray:
@@ -64,6 +64,29 @@ def fill_new_e_random(new_img: np.ndarray, empties: set) -> None:
                 new_img[j, i] = 1
 
 
+def average_fill(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    for i in empties:
+        j = 0
+        while j < len(new_img):
+            if j in empties:
+                j += 1
+            else:
+                sum_1 = sum_of_cluster(i - i_p, j, i_p, new_img)
+                sum_2 = sum_of_cluster(i + 1, j, i_p, new_img)
+                n = sum_1 + sum_2
+                count = min(n // (i_p * i_p * 2 // (i_p + 1)), i_p)
+                cort = list(map(int, ('1 ' * count + '0 ' * (i_p - count)).rstrip().split()))
+                rd.shuffle(cort)
+                new_img[i, j:j + i_p] = cort
+            j += i_p
+
+
+def fill_new_i_average(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    average_fill(new_img, empties, i_p)
+    new_img = new_img.T
+    average_fill(new_img, empties, i_p)
+
+
 def sum_of_cluster(y0: int, x0: int, i_p: int, new_img: np.ndarray) -> int:
     count = 0
     for elem in new_img[y0:y0+i_p, x0:x0+i_p]:
@@ -76,11 +99,17 @@ if __name__ == "__main__":
     # Baboo_256.tiff  Pepper_256.tiff
     # img = cv2.imread(f'images/{input()}', cv2.IMREAD_GRAYSCALE)
     img = cv2.imread(f'images/Baboo_256.tiff', cv2.IMREAD_GRAYSCALE)
-    n, k = img.shape[0], float(input())
-    new_image = create_empty(n, k)
+    fin_size = int(input())
+    n = img.shape[0]
+    k = fin_size / n
+    print(k)
+    # n, k = img.shape[0], float(input())
+    new_image = create_empty(fin_size)
     empt = find_empties(n, k)
+    print(sorted(empt))
     fill_clusters(img, new_image, empt, n, k)
     #fill_new_e_random(img, empt)
+    fill_new_i_average(new_image, empt, int(k))
     np.savetxt('output.csv', new_image, delimiter=',', fmt='%d')
     new_image = add_bright(new_image)
     cv2.imshow('Old image', img)
