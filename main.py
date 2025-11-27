@@ -84,7 +84,7 @@ def average_fill(new_img: np.ndarray, empties: set, i_p: int) -> None:
                 sum_1 = sum_of_cluster(i - i_p, j, i_p, new_img)
                 sum_2 = sum_of_cluster(i + 1, j, i_p, new_img)
                 n = sum_1 + sum_2
-                count = min(n // ((i_p * i_p * 2 + 1) // (i_p + 1)), i_p)
+                count = min(n // ((i_p ** 2 * 2) // (i_p + 1)), i_p)
                 cort = list(map(int, ('1 ' * count + '0 ' * (i_p - count)).rstrip().split()))
                 rd.shuffle(cort)
                 new_img[i, j:j + i_p] = cort
@@ -115,10 +115,8 @@ def otsu_threshold(img: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Бинарное изображение (0 и 255)
     """
-    # Вычисляем оптимальный порог методом Оцу
     threshold, _ = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    # Применяем порог для получения бинарного изображения
     binary_img = np.where(img > threshold, 255, 0).astype(np.uint8)
 
     return binary_img
@@ -135,18 +133,18 @@ def calculate_mse(img1: np.ndarray, img2: np.ndarray) -> float:
     Returns:
         float: Среднее квадратичное отклонение
     """
-    # Проверяем, что изображения имеют одинаковый размер
     if img1.shape != img2.shape:
         raise ValueError("Изображения должны иметь одинаковый размер")
 
-    # Преобразуем в float для избежания переполнения
     img1 = img1.astype(np.float64)
     img2 = img2.astype(np.float64)
 
-    # Вычисляем MSE
-    mse = np.mean((img1 - img2) ** 2)
+    mse = np.sum((img1 - img2) ** 2)
 
-    return mse
+    nstd = mse / max(np.sum(img1 ** 2), np.sum(img2 ** 2))
+
+    print(mse / np.sum(img1 ** 2), mse / np.sum(img2 ** 2))
+    return nstd
 
 
 def scale_image(img: np.ndarray, fin_size: int) -> np.ndarray:
@@ -164,7 +162,7 @@ def scale_image(img: np.ndarray, fin_size: int) -> np.ndarray:
 if __name__ == "__main__":
     # Baboo_256.tiff  Pepper_256.tiff
     # img = cv2.imread(f'images/{input()}', cv2.IMREAD_GRAYSCALE)
-    img = cv2.imread(f'images/Baboo_256.tiff', cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(f'images/Pepper_256.tiff', cv2.IMREAD_GRAYSCALE)
     fin_size = int(input())
     n = img.shape[0]
     k = fin_size / n
@@ -174,23 +172,18 @@ if __name__ == "__main__":
     np.savetxt('output.csv', new_image, delimiter=',', fmt='%d')
     new_image_bright = add_bright(new_image)
 
-    otsu_binary = otsu_threshold(img)
+    scaled = cv2.resize(img, (fin_size, fin_size))
+    otsu_binary = otsu_threshold(scaled)
 
-    otsu_scaled = scale_image(otsu_binary, fin_size)
-    otsu_scaled_bright = add_bright(otsu_scaled)
-
-    mse_original_otsu = calculate_mse(img, otsu_binary)
-    print(mse_original_otsu)
-
-    mse_scaled = calculate_mse(new_image, otsu_scaled)
+    mse_scaled = calculate_mse(new_image, otsu_binary)
     print(mse_scaled)
 
     cv2.imshow('Old image', img)
     cv2.imshow('New image', new_image_bright)
-    cv2.imshow('Otsu Scaled', otsu_scaled_bright)
+    cv2.imshow('Otsu Scaled', otsu_binary)
 
     cv2.imwrite('output.png', new_image_bright)
-    cv2.imwrite('otsu_scaled.png', otsu_scaled_bright)
+    cv2.imwrite('otsu_scaled.png', otsu_binary)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
