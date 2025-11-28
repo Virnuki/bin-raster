@@ -84,7 +84,7 @@ def average_fill(new_img: np.ndarray, empties: set, i_p: int) -> None:
                 sum_1 = sum_of_cluster(i - i_p, j, i_p, new_img)
                 sum_2 = sum_of_cluster(i + 1, j, i_p, new_img)
                 n = sum_1 + sum_2
-                count = min(n // ((i_p ** 2 * 2) // (i_p + 1)), i_p)
+                count = min(n // ((i_p ** 2 * 2 + 1) // (i_p + 1)), i_p)
                 cort = list(map(int, ('1 ' * count + '0 ' * (i_p - count)).rstrip().split()))
                 rd.shuffle(cort)
                 new_img[i, j:j + i_p] = cort
