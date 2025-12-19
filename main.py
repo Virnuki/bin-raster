@@ -1,5 +1,5 @@
 import random as rd
-
+from skimage.metrics import structural_similarity as ssim
 import cv2
 import numpy as np
 
@@ -236,20 +236,25 @@ if __name__ == "__main__":
     # Baboo_256.tiff  Pepper_256.tiff
     # img = cv2.imread(f'images/{input()}', cv2.IMREAD_GRAYSCALE)
     img = cv2.imread(f'images/Pepper_256.tiff', cv2.IMREAD_GRAYSCALE)
+    # img = np.array([[255, 150], [150, 51]], np.int16)
     fin_size = int(input())
     n = img.shape[0]
     k = fin_size / n
 
     new_image = scale_image(img, fin_size)
 
+    '''for row in new_image:
+        print(*row)
     np.savetxt('output.csv', new_image, delimiter=',', fmt='%d')
+    '''
     new_image_bright = add_bright(new_image)
 
     scaled = cv2.resize(img, (fin_size, fin_size))
     otsu_binary = otsu_threshold(scaled)
 
     mse_scaled = calculate_mse(new_image_bright, otsu_binary)
-    print(mse_scaled)
+    score = ssim(new_image_bright, otsu_binary)
+    print(mse_scaled, score)
 
     cv2.imshow('Old image', img)
     cv2.imshow('New image', new_image_bright)
