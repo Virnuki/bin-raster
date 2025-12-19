@@ -1,7 +1,7 @@
+import random as rd
+
 import cv2
 import numpy as np
-import random as rd
-from math import ceil
 
 
 def create_empty(fin_size: int) -> np.ndarray:
@@ -83,7 +83,7 @@ def average_fill(new_img: np.ndarray, empties: set, i_p: int) -> None:
             else:
                 sum_1 = sum_of_cluster(i - i_p, j, i_p, new_img)
                 sum_2 = sum_of_cluster(i + 1, j, i_p, new_img)
-                n = sum_1 + sum_2
+                n = (sum_1 + sum_2)
                 count = min(n // ((i_p ** 2 * 2 + 1) // (i_p + 1)), i_p)
                 cort = list(map(int, ('1 ' * count + '0 ' * (i_p - count)).rstrip().split()))
                 rd.shuffle(cort)
@@ -105,6 +105,78 @@ def sum_of_cluster(y0: int, x0: int, i_p: int, new_img: np.ndarray) -> int:
         for num_elem in elem:
             count += num_elem
     return count
+
+
+def sum_of_nearest(y0: int, x0: int, height: int, i_p: int, new_img: np.ndarray) -> int:
+    count = 0
+    for elem in new_img[y0:y0 + height * 2 + 1, x0:x0 + i_p]:
+        for num_elem in elem:
+            count += num_elem
+    return count
+
+
+def nice_fill_centers_1(new_img: np.ndarray, empties: set, height: int) -> None:
+    for i in empties:
+        for j in empties:
+            count = 0
+            for k in range(i - height, i + height):
+                for l in range(j - height, j + height):
+                    count += int(new_img[k, l])
+            new_img[i, j] = min(count // (2 * height ** 2), 1)
+
+
+def nice_fill_1(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    for i in empties:
+        j = 0
+        while j < len(new_img):
+            if j in empties:
+                j += 1
+            else:
+                height = 1
+                n = sum_of_nearest(i - height, j, height, i_p, new_img)
+                count = min(n // ((i_p * 2 + 1) // (i_p + 1)), i_p)
+                cort = list(map(int, ('1 ' * count + '0 ' * (i_p - count)).rstrip().split()))
+                rd.shuffle(cort)
+                new_img[i, j:j + i_p] = cort
+                j += i_p
+
+
+def nice_looked_fill_i_1(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    nice_fill_centers_1(new_img, empties, i_p)
+    nice_fill_1(new_img, empties, i_p)
+    new_img = new_img.T
+    nice_fill_1(new_img, empties, i_p)
+
+
+def nice_fill_centers_2(new_img: np.ndarray, empties: set, height: int) -> None:
+    for i in empties:
+        for j in empties:
+            count = 0
+            for k in range(i - height, i + height):
+                for l in range(j - height, j + height):
+                    count += int(new_img[k, l])
+            new_img[i, j] = min(count // (2 * height ** 2), 1)
+
+
+def nice_fill_2(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    for i in empties:
+        j = 0
+        while j < len(new_img):
+            if j in empties:
+                pass
+            else:
+                height = 1
+                n = sum_of_nearest(i - height, j, height, 1, new_img)
+                count = min(n // ((1 ** 2 * 2) // (1 + 1)), 1)
+                new_img[i, j] = count
+            j += 1
+
+
+def nice_looked_fill_i_2(new_img: np.ndarray, empties: set, i_p: int) -> None:
+    nice_fill_centers_2(new_img, empties, i_p)
+    nice_fill_2(new_img, empties, i_p)
+    new_img = new_img.T
+    nice_fill_2(new_img, empties, i_p)
 
 
 def otsu_threshold(img: np.ndarray) -> np.ndarray:
@@ -141,7 +213,7 @@ def calculate_mse(img1: np.ndarray, img2: np.ndarray) -> float:
 
     mse = np.sum((img1 - img2) ** 2)
 
-    nstd = mse / max(np.sum(img1 ** 2), np.sum(img2 ** 2))
+    nstd = mse / (img1.shape[0] ** 2) / 255 ** 2
 
     print(mse / np.sum(img1 ** 2), mse / np.sum(img2 ** 2))
     return nstd
@@ -154,7 +226,8 @@ def scale_image(img: np.ndarray, fin_size: int) -> np.ndarray:
     new_image = create_empty(fin_size)
     empt = find_empties(n, k)
     fill_clusters(img, new_image, empt, n, k)
-    fill_new_i_average(new_image, empt, int(k))
+    # fill_new_i_average(new_image, empt, int(k))
+    nice_looked_fill_i_1(new_image, empt, int(k))
 
     return new_image
 
@@ -175,7 +248,7 @@ if __name__ == "__main__":
     scaled = cv2.resize(img, (fin_size, fin_size))
     otsu_binary = otsu_threshold(scaled)
 
-    mse_scaled = calculate_mse(new_image, otsu_binary)
+    mse_scaled = calculate_mse(new_image_bright, otsu_binary)
     print(mse_scaled)
 
     cv2.imshow('Old image', img)
